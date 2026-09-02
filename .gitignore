@@ -4,8 +4,8 @@ TuSimpleDatasetarchive/
 # Per-run outputs (see README's "Per-run logging" section)
 # logs/
 # results/
-dds_edge_vision_simulation_results*.png
-dds_edge_vision_multiseed_results*.png
+# dds_edge_vision_simulation_results*.png
+# dds_edge_vision_multiseed_results*.png
 
 # Python
 __pycache__/
