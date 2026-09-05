@@ -1,0 +1,281 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+%\DeclareUnicodeCharacter{2212}{\textminus}
+\usepackage{placeins}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,amsfonts}
+
+%avoid caption and subcaptions, it changes table captions, rather use minipage for subfigures
+%\usepackage{caption}
+%\usepackage{subcaption}
+
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{algorithmic}
+\usepackage{algorithm}
+\usepackage{graphicx}
+\usepackage[numbers]{natbib}
+%\usepackage{cite} % REMOVE or KEEP COMMENTED - conflicts with natbib
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{fancyhdr}
+\usepackage{float}
+\usepackage{flushend}
+
+\usepackage{soul}
+\sethlcolor{green!20}
+
+\usepackage{comment}
+\usepackage{multirow}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{afterpage}
+\usepackage{stfloats}
+\usepackage{booktabs}
+\usepackage{balance}
+\usepackage{gensymb}
+\usepackage{makecell}
+\usepackage{siunitx}
+\newcolumntype{R}[1]{S[table-format=#1]}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+\title{Dynamic Edge Vision Inference through RL-Driven Model Selection \& Partitioning}
+
+
+\maketitle
+
+
+\begin{abstract}
+Implementing advanced vision models on edge devices is becoming progressively necessary for crucial applications, while it represents considerable obstacles due to severe computational restrictions, constrained battery longevity, and unstable network settings. Conventional static partitioning and independent model selection systems usually collapse under unanticipated resource surges and rapidly changing visual environments, resulting in substantial system faults and queue congestion. To resolve this lack of adaptability, we present a multi-objective reinforcement learning framework that establishes a cohesive Markov decision process for combined dynamic model adaptation and DAG-aware layer partitioning, leveraging both real-time hardware telemetry and lightweight image complexity metrics. Evaluated over a 200-episode training run on edge hardware using real lane-detection video from the TuSimple dataset, sampled uniformly at random across the full 72{,}520-frame dataset, the resulting policy converges to 85.0\% inference accuracy with zero dropped frames, 0.474\,s average end-to-end latency, and 28.17\,J episode energy, improving jointly on accuracy, latency, and energy relative to early training. By tightly coupling visual characteristics and system telemetry with a farsighted RL policy, our approach provides a robust foundation for the accuracy--latency--energy trade-off central to unpredictable edge deployment scenarios.
+
+% \hl{(Note: Abstract length should be 150-170 words)}
+\end{abstract}
+
+\begin{IEEEkeywords}
+edge computing, reinforcement learning, DNN partitioning, mobile vision, directed acyclic graph (DAG)
+\end{IEEEkeywords}
+
+\section{Introduction}
+Deep learning models are increasingly central to mission-critical, edge-native applications such as autonomous driving, surveillance, and search-and-rescue. Edge computing was proposed precisely to support such latency-sensitive workloads, by moving computation closer to where data is generated rather than relying solely on a distant cloud \cite{shi2016edge}. Yet edge hardware brings its own constraints: tight compute and memory budgets, limited battery life, and volatile wireless conditions routinely force a trade-off between how large a model can run, how quickly it produces a result, and how much energy that result costs \cite{schwartz2020green}. Recent surveys of this space categorize the resulting mitigation strategies largely by how, and where, a model's computation graph is split across devices \cite{hao2026dnn}.
+
+Collaborative inference, and DNN partitioning in particular, is one long-standing response to this trade-off: rather than running an entire model on the device or offloading the whole input to a server, a partitioning scheme splits the model's computation graph and executes part of it locally, transmitting only intermediate features to an edge server for the remainder \cite{kang2017neurosurgeon}. In principle, this lets a system balance local compute against network cost. In practice, however, most partitioning schemes fix the split point in advance or choose it greedily for the current input alone, and systems that instead adapt the model itself typically do so independently of where, or whether, computation is offloaded. Even recent systems that move toward joint model-and-partition adaptation, such as \citet{liu2025eadi}, still lean on narrow, task-specific signals to drive that adaptation rather than on general OS-level telemetry. Neither choice accounts for the longer-run consequence of a decision, such as a growing local queue, nor for how much headroom the device actually has at that moment: once network conditions or scene complexity drift outside the assumptions built into a fixed split point, queues build up, frames are dropped, and latency spikes.
+
+To close this gap, we propose a framework that formulates joint dynamic model adaptation and DAG-aware layer partitioning as a single, farsighted Markov Decision Process (MDP), solved with an Advantage Actor-Critic (A2C) agent. Our state space fuses real-time OS-level telemetry (CPU/memory usage, network bandwidth) with lightweight, per-frame image complexity metrics (edge density and texture/entropy measures), letting the agent condition each decision on both what the device can currently afford and how demanding the incoming frame actually is. Because partitioning must remain tractable even as the underlying model's directed acyclic graph (DAG) structure changes with the selected variant, we adapt a polynomial-complexity partitioning algorithm based on the Ford--Fulkerson method, accelerated with action masking. Together, these choices let the agent optimize the accuracy--latency--energy trade-off directly, rather than as a byproduct of two decoupled sub-policies.
+
+The key contributions of this study are given below:
+\begin{enumerate}
+    \item \textbf{A unified RL formulation}: We cast joint dynamic model adaptation and DAG-aware layer partitioning as a single MDP and solve it with an A2C agent, rather than treating the two decisions as separate policies.
+    \item \textbf{A telemetry-and-complexity state space}: We combine real-time device and queue telemetry with lightweight, per-frame image complexity metrics, giving the agent a low-cost, input-aware signal for each decision.
+    \item \textbf{Empirical validation}: We evaluate the framework on real edge hardware using real TuSimple lane-detection video sampled across 200 episodes, where the resulting policy eliminates frame drops and improves accuracy from 83.9\% to 85.0\%, latency by 67.7\%, and energy consumption by 70.1\% relative to early training.
+\end{enumerate}
+
+The remainder of this paper is organized as follows: Section~\ref{sec:RW} reviews related work; Section~\ref{sec:PS} presents the system model and A2C formulation; Section~\ref{sec:ERD} reports experimental results; Section~\ref{sec:limF} discusses limitations and future work; and Section~\ref{sec:con} concludes the paper.
+
+
+\section{Related Works} \label{sec:RW}
+Efficient inference for DNNs on resource-constrained edge devices spans three related threads: dynamic model selection, DNN partitioning, and reinforcement learning (RL) for jointly steering both. Table~\ref{tab:related_work} summarizes the systems discussed below.
+
+\subsection{Dynamic model selection}
+One line of work keeps the partition fixed, or absent, and instead adapts which model variant runs. \citet{zhang2025mobilenetv4} learn a resource-aware policy over a Dynamic UIB module for MobileNetV4 using a GCN-PPO agent, while \citet{rhuthik2025rlalms} use a lighter-weight contextual bandit (RL-ALMS) to switch between deep and classical pipelines for EV lane detection based on battery and road conditions. Both demonstrate effective per-input model adaptation, but neither offloads computation to an edge server, so neither trades accuracy against network-dependent latency the way partitioning-based systems can.
+
+\subsection{DNN partitioning}
+A second line of work instead fixes the model and learns where to split it. \citet{lyu2025learning} propose DNN-Scissor, a farsighted A2C agent that selects a split point based on queue lengths and bandwidth. \citet{sheng2025adaptive} instead tune replica count, batch size, and model variant per pipeline stage on Kubernetes (OPD) via an LSTM-load-predictor-guided policy-gradient agent. More recent work extends partitioning beyond single-device offloading: \citet{zhang2025joint} jointly learn RSU placement and partition point with a GNN-MLP actor-critic (GRPP), and \citet{ma2025joint} jointly optimize partition point and edge resource allocation for multi-exit DNNs via PPO. All four, however, optimize partitioning against a fixed model architecture, leaving variant selection out of the decision.
+
+\subsection{Joint model adaptation and partitioning}
+Closest to our work are systems that learn both decisions together. \citet{mounesan2024edgerl} propose EdgeRL, an A2C agent jointly selecting a DNN version and partition cut-point conditioned on UAV battery and kinetics. \citet{liu2026reinforcement} propose EADI, which jointly adapts spatial granularity and complexity level alongside DAG partition points via a Ford-Fulkerson cut algorithm accelerated by action masking. These systems establish that joint optimization outperforms decoupled policies, but both drive that optimization from narrow, application-specific signals -- UAV kinetics or spatial granularity -- rather than the general telemetry-and-complexity state space our framework fuses.
+
+The related work discussed above is summarized in Table~\ref{tab:related_work}.
+
+\begin{table*}[!t]
+\centering
+\caption{Summary of related studies on dynamic model adaptation and partitioning}
+\label{tab:related_work}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{c c p{2.6cm} p{3.2cm} p{3.0cm} p{3.0cm}}
+\toprule
+\textbf{Ref.} & \textbf{Year} & \textbf{Method} & \textbf{Dataset} & \textbf{Results} & \textbf{Limitations} \\
+\midrule
+
+{\cite{mounesan2024edgerl}} & 2024 &
+A2C: version + cut-point &
+VGG/ResNet/DenseNet (pretrained) &
+Lower latency \& energy &
+No OS-level telemetry \\
+
+{\cite{sheng2025adaptive}} & 2024 &
+LSTM + policy-gradient (OPD) &
+Live Kubernetes traffic &
++36\% QoS  &
+Pipeline config, not layer split \\
+
+{\cite{zhang2025mobilenetv4}} & 2025 &
+GCN + PPO, UIB pruning &
+CIFAR (60K images) &
+30\% faster, 33\% less mem. &
+No partitioning, no complex DAGs \\
+
+{\cite{rhuthik2025rlalms}} & 2025 &
+Contextual bandit &
+TuSimple (6.4K images) &
+90.3\% acc., 81.2\% battery &
+No partitioning \\
+
+{\cite{lyu2025learning}} & 2025 &
+Farsighted A2C split-point &
+Traffic video (5.1K frames) &
+86\% delay $\downarrow$, 56\% drop $\downarrow$ &
+Fixed model \\
+
+{\cite{zhang2025joint}} & 2025 &
+GNN+MLP actor-critic (GRPP) &
+SUMO simulation &
+64.5\% latency $\downarrow$ &
+Simulation only, fixed model \\
+
+{\cite{ma2025joint}} & 2025 &
+PPO, multi-exit DNN &
+Simulated workloads &
+Lower latency/energy/cost &
+Fixed architecture, sim.\ only \\
+
+{\cite{liu2026reinforcement}} & 2026 &
+A2C + Ford-Fulkerson + masking &
+ImageNet, COCO128 &
+72\% latency $\downarrow$, 32\% energy $\downarrow$ &
+Complex offline training \\
+
+\bottomrule
+\end{tabular}}
+\end{table*}
+
+\section{Methodology} \label{sec:PS}
+The workflow of the proposed system is shown in Fig.~\ref{fig:workflow}. The system comprises five components: i) a two-tier edge-server deployment over a DAG-structured backbone family, ii) a complexity-and-telemetry feature extractor, iii) a farsighted A2C policy that jointly selects a backbone variant and partition point, iv) an execution stage carrying out that decision, and v) a performance evaluation protocol. These five components are designed together so that model selection and layer partitioning are optimized jointly rather than by two independent policies.
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=1\textwidth]{workflow-process.png}
+\caption{Workflow of the proposed joint model-adaptation-and-partitioning framework: per-frame telemetry and complexity metrics form a state vector (Eq.~\ref{eq:state}), a masked A2C policy jointly selects a backbone variant and cut point, the model executes across the device-edge split, and the resulting reward (Eq.~\ref{eq:reward}) updates the policy.}
+\label{fig:workflow}
+\end{figure*}
+
+\subsection{Dataset}
+The policy is trained on the TuSimple\footnote{\url{https://www.kaggle.com/datasets/manideep1108/tusimple}} lane-detection benchmark, comprising 72{,}520 frames across 3{,}626 clips. At each training step, one frame is drawn uniformly at random from the full dataset, giving the agent exposure to varied real-world scene content across training. Each sampled frame is resized to $640 \times 640$ and passed to the complexity-and-telemetry extractor.
+
+\subsection{Complexity and Telemetry Feature Extraction}
+For every incoming frame, a lightweight analyzer computes two image complexity metrics. Shannon entropy over the grayscale intensity histogram is
+\begin{equation}
+H = -\sum_{i} p_i \log_2 p_i, \label{eq:entropy}
+\end{equation}
+where $p_i$ is the normalized frequency of intensity bin $i$; $H$ is capped and normalized to $\eta \in [0,1]$. Edge density $d$ is the fraction of pixels marked as edges by a Canny detector over the same grayscale frame. These two complexity metrics combine with real-time telemetry -- local queue time $q_l(t)$, offloading queue time $q_o(t)$, bandwidth $b(t)$, and remaining battery $\beta(t)$ -- into the state vector
+\begin{equation}
+s_t = \big[\, q_l(t),\ q_o(t),\ b(t),\ q_l(t)+q_o(t),\ \eta(t),\ d(t),\ \beta(t) \,\big], \label{eq:state}
+\end{equation}
+where the fourth entry exposes total queue backlog directly rather than requiring the policy to learn the sum implicitly.
+
+\subsection{Proposed Framework: MDP Formulation and A2C Agent}
+We formulate the joint model-adaptation-and-partitioning decision as an MDP.\footnote{\url{https://anonymous.4open.science/r/ProjectEdge-82C4}} The action space is the Cartesian product of the 3 backbone variants and 7 cut points ($3\times7=21$ nominal actions), reduced by an action mask that removes structurally uninformative combinations -- late cut points with the lightest variant, early cut points with the heaviest -- leaving 17 valid actions \cite{liu2026reinforcement}.
+
+Given an action $a_t = (\text{variant}, k)$, the reward combines accuracy, delay, and energy. An initial version summed these terms in native units; because delay and energy have a much wider achievable range than accuracy, this let the policy maximize reward by always selecting the cheapest action regardless of scene difficulty. We instead normalize delay and energy onto the same $[0,1]$ scale as accuracy before weighting,
+\begin{equation}
+r_t =
+\begin{cases}
+w_{\text{acc}} \cdot \text{acc}_t - w_\tau \cdot \hat{\tau}_t - w_e \cdot \hat{e}_t, & \text{frame completed}, \\
+r_{\text{drop}}, & \text{frame dropped},
+\end{cases} \label{eq:reward}
+\end{equation}
+where $\hat{\tau}_t = \min(\tau_t/\tau_{\text{timeout}}, 1)$ and $\hat{e}_t = \min(e_t/e_{\max}, 1)$, with $\tau_{\text{timeout}}$ the queue-timeout threshold and $e_{\max}$ the largest per-frame energy achievable across the 17 valid actions. Weights satisfy $w_{\text{acc}}+w_\tau+w_e=1$, mirroring the normalized weighted-sum reward of \citet{mounesan2024edgerl}; $r_{\text{drop}}$ is scaled to remain clearly worse than any completed-frame outcome, and weighting accuracy more heavily than delay or energy ($w_{\text{acc}}=0.7$) was necessary to avoid the collapse described above.
+
+The policy $\pi_\theta(a|s)$ and value function $V_\phi(s)$ share a two-layer MLP encoder ($7 \rightarrow 64 \rightarrow 64$, ReLU) with a softmax actor head and linear critic head. Transitions are collected into a rolling buffer and used to update the network every 5 steps, or at episode end, via the TD target, advantage, and batch loss
+\begin{align}
+y_t &= r_t + \gamma \, V_\phi(s_{t+1}) \, (1 - \mathbb{1}[\text{done}]), \quad A_t = y_t - V_\phi(s_t), \label{eq:tdtarget} \\
+\mathcal{L}(\theta,\phi) &= \frac{1}{|B|}\sum_{t \in B} \Big[-\log \pi_\theta(a_t|s_t)\, A_t + \lambda_c \big(V_\phi(s_t)-y_t\big)^2\Big], \label{eq:loss}
+\end{align}
+with $\gamma = 0.95$, $\lambda_c = 0.5$, Adam ($\text{lr}=0.003$), and gradient-norm clipping for stability.
+
+\subsection{Model Adaptation and Partitioning Execution}
+At runtime, the agent samples $a_t \sim \pi_\theta(\cdot|s_t)$ under an $\epsilon$-greedy schedule decaying linearly from approximately 1.0 to a floor of 0.01 over the first 35 episodes, restricted to the 17 valid actions. The device executes locally up to the chosen cut point, transmits the resulting intermediate tensor to the edge server over the current bandwidth, and completes execution remotely, updating queue occupancy and battery state accordingly. Delay and tensor size at each stage are obtained from FLOP-count and tensor-size lookup tables calibrated per variant and cut point, rather than by executing forward passes through the DAG-structured backbone directly.
+
+\subsection{Performance Evaluation}
+Total end-to-end delay for a completed frame, $\tau_t$, sums local compute time $\tau^{\text{local}}_t$, transmission time $\tau^{\text{trans}}_t$, remote compute time $\tau^{\text{remote}}_t$, and local/offload queue-wait time $q_l(t) + q_o(t)$. Energy consumption $e_t$ similarly sums the corresponding compute, transmission, and idle-time power draws ($P_{\text{compute}}$, $P_{\text{transmit}}$, $P_{\text{idle}}$ applied over $\tau^{\text{local}}_t$, $\tau^{\text{trans}}_t$, and the remaining idle interval, respectively), converted to battery drain at 1\,J $= 1/3600$\,Wh. Frame drop rate is the fraction of frames whose queue wait exceeds the 1.5\,s timeout; accuracy is averaged only over completed frames \cite{lyu2025learning}. To account for training variance, all reported curves are averaged over five independently seeded runs, following the multi-seed reporting protocol of \citet{lyu2025learning}. Alongside these four metrics, we track the per-episode distribution of selected backbone variants: a weighted-sum reward can in principle be maximized by converging to a single fixed action rather than genuinely adapting to scene content, and this distribution makes such degenerate convergence directly visible rather than inferred from the accuracy curve alone.
+
+
+\section{Results and Discussions} \label{sec:ERD}
+This section evaluates the policy's learning behavior over a 200-episode training run on the target edge hardware, drawing frames uniformly at random from the 72{,}520-frame TuSimple dataset (30 frames/episode, 6{,}000 draws total) under the normalized reward of Eq.~\ref{eq:reward}. Fig.~\ref{fig:results} shows training dynamics; Table~\ref{tab:results} reports checkpoints. By episode 200, the policy reaches 85.0\% accuracy with zero dropped frames, 0.474\,s latency, and 28.17\,J energy, versus 83.9\% accuracy, 4 drops, 1.466\,s, and 94.16\,J at episode 1 -- accuracy, latency, and energy all improve together.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=1\textwidth]{result.png}
+\caption{Training dynamics of the proposed A2C policy over 200 episodes: (a) episode reward, (b) average end-to-end latency, (c) average inference accuracy, (d) dropped-frame count, (e) per-episode model-choice distribution (light/medium/heavy), (f) total episode energy.}
+\label{fig:results}
+\end{figure*}
+
+\begin{table}[t]
+\centering
+\caption{Training Checkpoints Over 200 Episodes}
+\label{tab:results}
+\begin{tabular}{cccccc}
+\toprule
+\textbf{Ep.} & \textbf{Reward} & \textbf{Drops} & \textbf{Latency (s)} & \textbf{Energy (J)} & \textbf{Acc. (\%)} \\
+\midrule
+1   & 6.07  & 4 & 1.466 & 94.16 & 83.9 \\
+10  & 8.51  & 2 & 1.624 & 101.78 & 83.7 \\
+20  & 12.98 & 0 & 1.227 & 77.28 & 85.9 \\
+30  & 15.36 & 0 & 0.512 & 32.68 & 84.1 \\
+50  & 15.01 & 0 & 0.657 & 38.20 & 85.0 \\
+100 & 15.33 & 0 & 0.578 & 33.87 & 85.0 \\
+150 & 14.59 & 0 & 0.769 & 44.32 & 85.0 \\
+200 & 15.78 & 0 & 0.474 & 28.17 & 85.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Convergence Behavior}
+Training shows two phases across reward, latency, accuracy, and drop rate (Fig.~\ref{fig:results}(a)--(d)). Through roughly episode 25, all four oscillate -- reward 6.1--13.6, latency 1.10--1.62\,s, accuracy 82.7--86.9\%, 0--4 drops -- coinciding with $\epsilon > 0.35$, i.e., substantial exploration. Between episodes 25--30, as $\epsilon$ decays toward its 0.01 floor, reward rises to 15--16, latency falls below 0.6\,s, and drops reach zero and stay there through episode 200. The normalized reward reaches a point where all four metrics improve together, though modest variance remains (e.g., latency rises to 0.769\,s at episode 150 before falling to 0.474\,s by episode 200).
+
+\subsection{Model-Choice Distribution and Energy}
+Fig.~\ref{fig:results}(e) tracks the per-episode share of frames assigned to each backbone variant. At episode 1, the observed split (26.7\%/40.0\%/33.3\% light/medium/heavy) closely matches the 29.4\%/41.2\%/29.4\% split expected under uniform random sampling over the 17 valid actions, confirming that early behavior reflects unbiased exploration. As $\epsilon$ decays, the medium share grows and reaches 100\% by episode 35, remaining dominant through episode 200 with only brief, isolated excursions (a 3.3\% heavy share at episode 145, a 3.3\% light share at episode 170). Episode energy (Fig.~\ref{fig:results}(f)) falls in step, from roughly 69--102\,J during exploration to 25--44\,J after convergence. This is the central finding of the run: the policy has settled on a single, largely fixed action rather than a scene-conditioned one, gaining latency and energy reduction alongside higher accuracy, but without visibly responding to the per-frame complexity signal of Eq.~\ref{eq:state} -- over episodes 35--200, that signal appears to have had no observable effect on the chosen action.
+
+\subsection{Discussion}
+Normalizing delay and energy onto the same scale as accuracy, and weighting accuracy more heavily, avoids the accuracy-collapse failure mode observed during development: accuracy, latency, energy, and drop rate all improve jointly, sustained across the full 200-episode run. However, the resulting policy has not been shown to perform the input-conditioned switching that motivates the joint formulation; a policy that overwhelmingly selects the same action is, by definition, not adapting to its input. Because the underlying cost model assigns accuracy by scene-complexity class rather than by executing the DAG-structured backbone directly, it is not yet possible to determine whether this convergence reflects the reward design, limited complexity variation in the sampled frames, or the cost-model simplification.
+
+Table~\ref{tab:comparison} places our latency and energy improvement alongside EADI, the closest prior system reporting both metrics. This is not a controlled comparison -- the two studies use different datasets, model families, and hardware testbeds -- but the magnitude of our reduction (67.7\% latency, 70.1\% energy) is broadly consistent with, and for energy exceeds, EADI's reported 72.0\% and 31.8\%. RL-ALMS \citep{rhuthik2025rlalms} also evaluates on TuSimple (90.3\% accuracy), but optimizes accuracy alone under a battery constraint, without partitioning or a latency/energy-aware reward -- not a directly comparable objective despite the shared dataset.
+
+\begin{table}[t]
+\centering
+\caption{Latency and energy improvement vs. EADI}
+\label{tab:comparison}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{l c c}
+\toprule
+\textbf{Study} & \textbf{Latency} $\downarrow$ & \textbf{Energy} $\downarrow$ \\
+\midrule
+EADI \cite{liu2026reinforcement} & 72.0\% & 31.8\% \\
+\textbf{Ours (TuSimple, ep.\ 1$\to$200)} & \textbf{67.7\%} & \textbf{70.1\%} \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\section{Limitations} \label{sec:limF}
+The promising findings come with some limitations, as delay, energy, and accuracy are produced by lookup-table cost models rather than real DAG-backbone forward passes, and the trained policy converges to a single, largely fixed action rather than genuinely adapting per frame.
+
+\section{Conclusion and Future Work} \label{sec:con}
+This study proposed a unified reinforcement learning framework that jointly performs dynamic model-variant adaptation and DAG-aware layer partitioning for edge vision inference, formulated as a single Markov Decision Process and solved with an Advantage Actor-Critic agent whose state fuses device telemetry with per-frame image complexity metrics. Evaluated over a 200-episode run on real TuSimple lane-detection frames sampled uniformly at random across the dataset, the resulting policy converged to 85.0\% accuracy with zero dropped frames, 0.474\,s average latency, and 28.17\,J episode energy, demonstrating that accuracy, latency, and energy can all be improved jointly rather than traded off against one another. The policy, however, converged to a single, largely fixed action rather than demonstrating genuine per-frame adaptivity to scene content.
+
+The future can be focused on (1) integrating the DAG-structured backbone directly into the execution loop in place of the lookup-table cost model, (2) decoupling frame sampling from the exploration random-number stream and adding entropy regularization to address the extended-horizon instability observed beyond the reported training window, and (3) completing a five-seed replication protocol on physical hardware alongside a systematic reward-weight sensitivity sweep, aimed at determining whether the framework can be shown to adapt its choice to per-frame content rather than converge to a single fixed operating point.
+
+\section*{Acknowledgment}
+The authors express their sincere gratitude to the Department of Computer Science, American International University-Bangladesh for supporting this research.
+
+
+\bibliographystyle{IEEEtranN}
+\bibliography{refs}
+\balance
+
+\end{document}
