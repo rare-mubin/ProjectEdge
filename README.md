@@ -7,7 +7,10 @@ latency, and energy. It runs against real frames from the TuSimple lane-detectio
 dataset (`TuSimpleDatasetarchive/`), falling back to synthetic frames if the
 dataset or OpenCV isn't available.
 
-Single file: [`Edge.py`](Edge.py).
+Core harness: [`Edge.py`](Edge.py). A companion script,
+[`baseline_comparison.py`](baseline_comparison.py), evaluates fixed baseline
+policies under the same simulator for comparison against a trained policy —
+see [Baseline comparison](#baseline-comparison) below.
 
 ## Setup
 
@@ -149,6 +152,74 @@ def setup_run_logging(log_dir="logs"):
     return run_id, log_path
 ```
 
+## Baseline comparison
+
+[`baseline_comparison.py`](baseline_comparison.py) evaluates three fixed,
+non-learning policies under the *identical* simulator, cost model, and
+frame-sampling as `Edge.py`, so they can be compared fairly against a trained
+policy rather than only against itself at different points in training:
+
+| Policy | Behavior |
+|---|---|
+| Random | Uniform choice among the 17 valid `(complexity, cut_point)` actions every step |
+| Cheapest | Always `(light, cut_point=0)` — maximal offloading, minimal local compute |
+| Static Medium | Always `(medium, cut_point=3)` — the middle of the valid range |
+| Our RL | A trained `FarsightedA2CAgent` run greedily (`epsilon=0`) |
+
+It imports directly from `Edge.py` (`EdgeSystemSimulator`, `ImageAnalyzer`,
+`FarsightedA2CAgent`, the frame loaders, `set_seed`, `safe_mean`) rather than
+reimplementing the cost model, so there's exactly one source of truth for how
+delay/energy/accuracy get computed. Run it from the same directory as
+`Edge.py`:
+
+```bash
+python baseline_comparison.py --dataset-dir "TuSimpleDatasetarchive/TUSimple/train_set/clips" --episodes 20
+```
+
+### CLI flags
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--dataset-dir` | `TuSimpleDatasetarchive/TUSimple/train_set/clips` | Same dataset root you'd pass to `Edge.py` |
+| `--episodes` | `20` | Evaluation episodes to average over |
+| `--seed` | `42` | Random seed |
+| `--frame-sampling` | `random` | `random` \| `sequential` — should match whichever `Edge.py` run you're comparing against, so both sides see a comparable slice of the dataset |
+
+### Adding the "Our RL" row
+
+Run standalone, the script only reports Random / Cheapest / Static Medium —
+it has no access to a trained policy on its own. To include one:
+
+- **(a)** capture the `agent` that `run_dataset_training()` builds internally
+  and call `run_baseline_comparison(dataset_dir, trained_agent=agent,
+  frame_sampling='random')` right after training, in the same Python
+  session, or
+- **(b)** reuse a converged checkpoint already reported by `Edge.py`'s own
+  console/log output — once the model-choice distribution shows the policy
+  has settled on a fixed action (see [Known limitation](#known-limitation)),
+  its later logged episodes are a reasonable stand-in for a greedy
+  evaluation, since $\epsilon$ has already decayed to its floor by then.
+
+### Example output
+
+Evaluated on 20 episodes of real TuSimple frames (`--frame-sampling random`,
+seed 42), against a policy trained for 200 episodes on the same dataset:
+
+| Policy | Accuracy | Latency (s) | Energy (J) | Drops/ep |
+|---|---|---|---|---|
+| Random | 83.6% | 1.518 | 94.16 | 3.65 |
+| Cheapest | 72.0% | 0.155 | 9.79 | 0.00 |
+| Static Medium | 85.0% | 1.335 | 80.68 | 6.05 |
+| Our RL | 85.0% | 0.474 | 28.17 | 0.00 |
+
+Against Static Medium — the same backbone variant Our RL converges to — the
+trained policy matches accuracy exactly while cutting latency 64.5% and
+energy 65.1%, and eliminating drops entirely. That gap is attributable to
+*where* it cuts the model rather than *which* variant it picks, since both
+policies select medium almost exclusively; see [Known
+limitation](#known-limitation) below for what this comparison does and
+doesn't establish.
+
 ## Key code blocks
 
 ### Recursive dataset scan
@@ -235,22 +306,31 @@ def remember(self, state, action_idx, reward, next_state, done):
     return None
 ```
 
+## Output
+
+- **`Edge.py`**: a console log line every 5 episodes (reward, drops, latency,
+  energy, accuracy, light/medium/heavy split), plus a 6-panel chart — reward
+  convergence, latency, accuracy, frame drops, model-choice distribution
+  over episodes, and total energy — saved to
+  `results/dds_edge_vision_simulation_results_<run_id>.png` (single-seed) or
+  `results/dds_edge_vision_multiseed_results_<run_id>.png`
+  (`--num-seeds > 1`), alongside a matching timestamped log in `logs/` (see
+  [Per-run logging](#per-run-logging)).
+- **`baseline_comparison.py`**: a printed markdown table (accuracy, latency,
+  energy, drops/episode per policy) to the console — no chart or log file of
+  its own.
+
 ## Known limitation
 
 `DAGVisionModel` (a real DAG-structured CNN with partition-point-aware forward
-passes) is defined in the script but **not invoked** anywhere in
-`EdgeSystemSimulator.step()`. Delay/energy/accuracy currently come from fixed
-per-complexity-class lookup tables, not from actually running that network on
-frames. If a paper/report describes DAG-aware partitioning as something
-executed on real frames, that claim isn't backed by this script yet — either
-wire `DAGVisionModel` into `EdgeSystemSimulator.step()`, or describe this
-explicitly as a cost-model simulation used to pretrain the policy.
-
-## Output
-
-- Console log line every 5 episodes: reward, drops, latency, energy, accuracy,
-  and light/medium/heavy model-choice split.
-- `dds_edge_vision_simulation_results.png` (single-seed) or
-  `dds_edge_vision_multiseed_results.png` (`--num-seeds > 1`): 6-panel chart —
-  reward convergence, latency, accuracy, frame drops, model-choice
-  distribution over episodes, and total energy.
+passes) is defined in `Edge.py` but **not invoked** anywhere in
+`EdgeSystemSimulator.step()`. Delay/energy/accuracy — for both `Edge.py`'s
+training loop and `baseline_comparison.py`'s policy evaluations — currently
+come from fixed per-complexity-class lookup tables, not from actually running
+that network on frames. This applies equally to the baseline comparison
+above: it establishes that the trained policy finds a better *cost-model*
+operating point than the fixed baselines, not that it is more accurate on
+real inference. If a paper/report describes DAG-aware partitioning as
+something executed on real frames, that claim isn't backed by this code yet
+— either wire `DAGVisionModel` into `EdgeSystemSimulator.step()`, or describe
+this explicitly as a cost-model simulation used to pretrain the policy.

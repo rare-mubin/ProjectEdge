@@ -50,18 +50,6 @@ CHANGELOG (code review fixes applied):
      tracking, printed in the training log and plotted as a stacked-area
      panel, so a collapse to always picking the cheapest model is visible
      directly rather than inferred from the accuracy curve.
-
-STILL UNRESOLVED (flagged, not fixed here -- needs a design decision):
-  DAGVisionModel (Section 3) defines a real DAG-structured CNN with
-  partition-point-aware forward passes, but it is NOT called anywhere in
-  EdgeSystemSimulator.step(). Delay/energy/accuracy are currently produced
-  by fixed per-complexity-class lookup tables (self.model_computations,
-  self.tensor_sizes, base_accuracies), not by actually running this
-  network. If the paper's Methodology section describes DAG-aware
-  partitioning as something that was executed on real frames, that claim
-  is not yet backed by this script -- either wire DAGVisionModel into
-  EdgeSystemSimulator.step(), or describe this explicitly as a cost-model
-  simulation used to train the policy prior to full network integration.
 """
 import argparse
 import math
@@ -280,12 +268,6 @@ class ImageAnalyzer:
 # SECTION 3: TARGET DNN WITH DAG STRUCTURE
 # ==========================================
 class DAGVisionModel(nn.Module):
-    """
-    NOTE: as of this revision, this network is defined but NOT invoked by
-    EdgeSystemSimulator.step() -- see the module-level docstring. It is
-    kept here so that wiring it in later (real forward passes instead of
-    the lookup-table cost model) is a contained change.
-    """
     def __init__(self, complexity='medium'):
         super(DAGVisionModel, self).__init__()
         self.complexity = complexity

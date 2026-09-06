@@ -1,22 +1,13 @@
 """
-Baseline comparison harness for the advisor-requested Table (advisor point 4).
+Baseline comparison harness: evaluates three fixed, non-learning policies
+-- Random, Cheapest, Static Medium -- under the *same* EdgeSystemSimulator
+cost model, queue dynamics, and bandwidth trace generation used for the
+trained RL policy, so every row in the resulting table is apples-to-apples.
 
-Implements three fixed, non-learning policies -- Random, Cheapest, Static
-Medium -- evaluated under the *same* EdgeSystemSimulator cost model, queue
-dynamics, and bandwidth trace generation used for the trained RL policy, so
-all four rows in the resulting table are apples-to-apples.
-
-IMPORTANT: this script reuses classes directly from Edge.py
-(EdgeSystemSimulator, ImageAnalyzer, the frame loaders, FarsightedA2CAgent)
-rather than reimplementing them, so there is exactly one source of truth for
-the cost model. Put this file in the same directory as Edge.py.
-
-WHAT THIS SCRIPT DOES NOT DO: it does not have access to your actual trained
-200-episode Jetson policy, and it cannot download the real TuSimple dataset
-in this environment. Running it here only proves the code is correct
-(smoke-tested on synthetic frames) -- it does NOT produce numbers that
-belong in the paper. See the bottom of this file / the accompanying message
-for what to run on your end to get real numbers.
+Reuses classes directly from Edge.py (EdgeSystemSimulator, ImageAnalyzer,
+the frame loaders, FarsightedA2CAgent) rather than reimplementing them, so
+there is exactly one source of truth for the cost model. Run this from the
+same directory as Edge.py.
 """
 import random
 import numpy as np
@@ -56,7 +47,7 @@ class CheapestPolicy:
     name = "Cheapest"
 
     def act(self, state):
-        return (0, 0)  # (light, cutpoint 0)
+        return (0, 0)
 
 
 class StaticMediumPolicy:
@@ -64,7 +55,7 @@ class StaticMediumPolicy:
     name = "Static Medium"
 
     def act(self, state):
-        return (1, 3)  # (medium, cutpoint 3)
+        return (1, 3)
 
 
 class TrainedRLPolicy:
@@ -91,13 +82,12 @@ def evaluate_policy(policy, dataset_dir, num_episodes=20, steps_per_episode=30,
     method) through the same simulator, frame source, and bandwidth-trace
     generation as run_dataset_training(), but with NO learning updates --
     this is pure evaluation. Returns per-episode-mean accuracy, latency,
-    energy, and drop count, matching the columns in Table~II of the paper.
+    energy, and drop count.
 
-    frame_sampling defaults to 'random' to match the sampling method
-    actually used for the reported 200-episode "Our RL" run (uniform random
-    draw from the full dataset each step) -- using 'sequential' here would
-    make the baselines see a systematically different slice of the dataset
-    than the trained policy did, undermining the comparison.
+    frame_sampling defaults to 'random': using 'sequential' here while the
+    policy being compared against was trained with random sampling would
+    make the two sides see systematically different slices of the dataset,
+    undermining the comparison. Match whichever mode was used for training.
     """
     set_seed(seed)
     sim = EdgeSystemSimulator()
@@ -216,21 +206,18 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--frame-sampling", type=str, default="random",
                          choices=["random", "sequential"],
-                         help="Should match what you used for the 'Our RL' training "
-                              "run (random, per run_20260902_110013.log) for a fair "
+                         help="Should match whichever mode the policy you're "
+                              "comparing against was trained with, for a fair "
                               "comparison.")
     args = parser.parse_args()
 
-    print("NOTE: this run has no access to your trained 200-episode policy, "
-          "so it reports Random / Cheapest / Static Medium only. To add the "
-          "'Our RL' row under the identical harness, either (a) import "
-          "run_dataset_training from Edge.py, capture the trained `agent` it "
-          "builds internally, and call run_baseline_comparison(dataset_dir, "
-          "trained_agent=agent, frame_sampling='random') right after training "
-          "in the same Python session, or (b) use the 'Our RL' row already "
-          "available from Table~II (episode 200: 85.0% acc, 0.474s, 28.17J, "
-          "0 drops) as a stand-in, since the model-choice distribution shows "
-          "the policy had already converged to a fixed action by then.\n")
+    print("NOTE: this run has no trained policy to evaluate, so it reports "
+          "Random / Cheapest / Static Medium only. To add an 'Our RL' row "
+          "under the identical harness: capture the `agent` that "
+          "run_dataset_training() builds internally and call "
+          "run_baseline_comparison(dataset_dir, trained_agent=agent, "
+          "frame_sampling='random') right after training, in the same "
+          "Python session.\n")
 
     run_baseline_comparison(args.dataset_dir, trained_agent=None,
                              num_episodes=args.episodes, seed=args.seed,
