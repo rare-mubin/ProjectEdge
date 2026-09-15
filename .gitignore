@@ -1,0 +1,21 @@
+# Dataset (large, downloaded separately -- see README's "Downloading" section)
+TuSimpleDatasetarchive/
+
+# Per-run outputs (see README's "Per-run logging" section)
+# logs/
+# results/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

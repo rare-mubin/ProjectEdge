@@ -1,0 +1,56 @@
+Command: python Edge.py --dataset-dir TuSimpleDatasetarchive/TUSimple/train_set/clips --episodes 200 --frame-sampling random --no-show
+Run ID:  20260902_110013
+Started: 2026-09-02T11:00:13.379373
+Log file: logs\run_20260902_110013.log
+=============================================================
+DNN-Scissor Farsighted A2C Local Dataset Execution Loop
+(seed=42, w_acc=0.7, w_delay=0.15, w_energy=0.15, frame_sampling=random)
+=============================================================
+Successfully loaded real dataset. Found 72520 frames.
+Simulation will process batches of 30 frames per episode.
+Episode 01/200 | Reward:    6.07 | Drops:  4 | E2E Latency: 1.466s | Energy: 94.16J | Acc: 83.9% | Model choice L/M/H: 26.7%/40.0%/33.3%
+Episode 05/200 | Reward:   11.73 | Drops:  0 | E2E Latency: 1.339s | Energy: 86.99J | Acc: 82.7% | Model choice L/M/H: 40.0%/33.3%/26.7%
+Episode 10/200 | Reward:    8.51 | Drops:  2 | E2E Latency: 1.624s | Energy: 101.78J | Acc: 83.7% | Model choice L/M/H: 23.3%/60.0%/16.7%
+Episode 15/200 | Reward:    6.10 | Drops:  4 | E2E Latency: 1.603s | Energy: 99.69J | Acc: 86.9% | Model choice L/M/H:  6.7%/63.3%/30.0%
+Episode 20/200 | Reward:   12.98 | Drops:  0 | E2E Latency: 1.227s | Energy: 77.28J | Acc: 85.9% | Model choice L/M/H: 10.0%/70.0%/20.0%
+Episode 25/200 | Reward:   13.64 | Drops:  0 | E2E Latency: 1.099s | Energy: 69.00J | Acc: 86.8% | Model choice L/M/H:  3.3%/76.7%/20.0%
+Episode 30/200 | Reward:   15.36 | Drops:  0 | E2E Latency: 0.512s | Energy: 32.68J | Acc: 84.1% | Model choice L/M/H: 10.0%/86.7%/ 3.3%
+Episode 35/200 | Reward:   15.55 | Drops:  0 | E2E Latency: 0.526s | Energy: 31.06J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 40/200 | Reward:   15.81 | Drops:  0 | E2E Latency: 0.467s | Energy: 27.77J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 45/200 | Reward:   15.66 | Drops:  0 | E2E Latency: 0.523s | Energy: 31.99J | Acc: 85.3% | Model choice L/M/H:  0.0%/96.7%/ 3.3%
+Episode 50/200 | Reward:   15.01 | Drops:  0 | E2E Latency: 0.657s | Energy: 38.20J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 55/200 | Reward:   15.65 | Drops:  0 | E2E Latency: 0.503s | Energy: 29.73J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 60/200 | Reward:   15.34 | Drops:  0 | E2E Latency: 0.574s | Energy: 33.91J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 65/200 | Reward:   15.26 | Drops:  0 | E2E Latency: 0.595s | Energy: 34.78J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 70/200 | Reward:   15.23 | Drops:  0 | E2E Latency: 0.602s | Energy: 35.42J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 75/200 | Reward:   15.98 | Drops:  0 | E2E Latency: 0.427s | Energy: 25.57J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 80/200 | Reward:   15.35 | Drops:  0 | E2E Latency: 0.573s | Energy: 33.96J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 85/200 | Reward:   15.99 | Drops:  0 | E2E Latency: 0.424s | Energy: 25.42J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 90/200 | Reward:   15.50 | Drops:  0 | E2E Latency: 0.540s | Energy: 31.80J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 95/200 | Reward:   15.82 | Drops:  0 | E2E Latency: 0.465s | Energy: 27.62J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 100/200 | Reward:   15.33 | Drops:  0 | E2E Latency: 0.578s | Energy: 33.87J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 105/200 | Reward:   15.77 | Drops:  0 | E2E Latency: 0.477s | Energy: 28.34J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 110/200 | Reward:   15.92 | Drops:  0 | E2E Latency: 0.440s | Energy: 26.29J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 115/200 | Reward:   15.42 | Drops:  0 | E2E Latency: 0.559s | Energy: 32.77J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 120/200 | Reward:   15.59 | Drops:  0 | E2E Latency: 0.518s | Energy: 30.53J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 125/200 | Reward:   15.50 | Drops:  0 | E2E Latency: 0.539s | Energy: 31.70J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 130/200 | Reward:   15.55 | Drops:  0 | E2E Latency: 0.526s | Energy: 31.07J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 135/200 | Reward:   15.40 | Drops:  0 | E2E Latency: 0.562s | Energy: 32.98J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 140/200 | Reward:   15.67 | Drops:  0 | E2E Latency: 0.496s | Energy: 29.79J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 145/200 | Reward:   15.34 | Drops:  0 | E2E Latency: 0.593s | Energy: 35.05J | Acc: 85.4% | Model choice L/M/H:  0.0%/96.7%/ 3.3%
+Episode 150/200 | Reward:   14.59 | Drops:  0 | E2E Latency: 0.769s | Energy: 44.32J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 155/200 | Reward:   15.32 | Drops:  0 | E2E Latency: 0.581s | Energy: 34.06J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 160/200 | Reward:   15.66 | Drops:  0 | E2E Latency: 0.502s | Energy: 29.67J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 165/200 | Reward:   15.78 | Drops:  0 | E2E Latency: 0.474s | Energy: 28.18J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 170/200 | Reward:   15.24 | Drops:  0 | E2E Latency: 0.580s | Energy: 33.92J | Acc: 84.6% | Model choice L/M/H:  3.3%/96.7%/ 0.0%
+Episode 175/200 | Reward:   15.50 | Drops:  0 | E2E Latency: 0.539s | Energy: 31.78J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 180/200 | Reward:   15.75 | Drops:  0 | E2E Latency: 0.481s | Energy: 28.60J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 185/200 | Reward:   15.25 | Drops:  0 | E2E Latency: 0.597s | Energy: 34.94J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 190/200 | Reward:   15.20 | Drops:  0 | E2E Latency: 0.609s | Energy: 35.60J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 195/200 | Reward:   15.18 | Drops:  0 | E2E Latency: 0.615s | Energy: 35.84J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+Episode 200/200 | Reward:   15.78 | Drops:  0 | E2E Latency: 0.474s | Energy: 28.17J | Acc: 85.0% | Model choice L/M/H:  0.0%/100.0%/ 0.0%
+
+Training loop complete.
+Successfully saved performance chart to 'results\dds_edge_vision_simulation_results_20260902_110013.png'.
+
+Run 20260902_110013 complete. Log: logs\run_20260902_110013.log
