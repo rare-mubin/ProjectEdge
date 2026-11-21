@@ -59,9 +59,9 @@ class StaticMediumPolicy:
 
 
 class TrainedRLPolicy:
-    """Wraps a trained FarsightedA2CAgent in pure-exploitation mode
-    (epsilon=0) so it can be evaluated under the identical harness used
-    for the fixed baselines below."""
+    """Wraps a trained FarsightedA2CAgent with epsilon=0, so there is no
+    random exploration. It still samples from the masked policy
+    distribution; it does not take the argmax."""
     name = "Our RL"
 
     def __init__(self, agent):
